@@ -1,0 +1,2 @@
+# Real-time-skin-shader-in-GLSL
+This paper presents an approach through OpenGL shading language for the rendering of human skin for game development. This method works in texture space so it requires an initial work for the creation of the images that are used for the simulation of the sub surface scattering effect. The final image consists of a weighted average of the input images, the algorithm calculate this average trying to simulate the effect of the light scattering through the layers of the skin.
