@@ -1,0 +1,126 @@
+uniform sampler2D diffuse;
+uniform sampler2D scatter1;
+uniform sampler2D scatter2;
+uniform sampler2D normal;
+uniform sampler2D noise;
+
+
+varying vec2 Texcoord;
+varying vec3 ViewDirection;
+varying vec3 LightDirection;
+
+
+
+uniform vec4 fvAmbient;
+uniform vec4 fvSpecular;
+uniform vec4 fvDiffuse;
+uniform vec4 fvLightColor;
+uniform float fSpecularPower;
+
+uniform float slide;
+
+
+vec4 lerp(vec4 input1, vec4 input2, float weight)
+{ // the weight for lerping
+  
+return input1*(1.0-weight)+input2*(weight);
+
+}
+
+vec4 profile(vec4 color)
+{
+color.x *= 0.118;
+color.y *= 0.198;
+color.z *= 0;
+return color;
+}
+
+
+
+vec4 GammaCorrection (vec4 Color)
+{
+
+vec4 Final_color;
+
+Final_color.x = pow(Color.x,2.2);
+Final_color.y = pow(Color.y,2.2);
+Final_color.z = pow(Color.z,2.2);
+Final_color.w = pow(Color.w,2.2);
+return Final_color;
+}
+
+
+void main( void )
+{
+
+ vec4 Cdiffuse = texture2D( diffuse, Texcoord );
+ vec4 Cnoise   = texture2D( noise, Texcoord );
+ vec4 Cscatter1= texture2D( scatter1, Texcoord + Cnoise.yz/512);
+ vec4 Cscatter2= texture2D( scatter2, Texcoord + Cnoise.xy/512);
+ vec4 Cnormal  = texture2D( normal, Texcoord );
+
+ Cnormal = GammaCorrection(Cnormal);
+
+
+ vec3  fvNormal         = normalize( ( Cnormal.xyz * 2.0 ) - 1.0 );
+ 
+ 
+ vec3  fvLightDirection = normalize( LightDirection );
+ float fNDotL           = max(0,dot( fvNormal, fvLightDirection )); 
+ 
+  vec3  fvReflection     = normalize( ( ( 2.0 * fvNormal ) * fNDotL ) - fvLightDirection ); 
+  vec3  fvViewDirection  = normalize( ViewDirection );
+  float fRDotV           = max( 0.0, dot( fvReflection, fvViewDirection ) );
+ 
+ 
+ Cdiffuse = GammaCorrection(Cdiffuse); 
+ Cscatter1 = GammaCorrection(Cscatter1);
+ Cscatter2 = GammaCorrection(Cscatter2);
+ Cnoise = GammaCorrection(Cnoise);
+  
+ float fresnelBias = 0.10;
+ float fresnelScale = 0.25;
+ float fresnelPower = 1.30;
+ 
+ float lum = dot(Cdiffuse.xyz, vec3(0.33, 0.59, 0.11));
+
+
+ vec4 Fresnel = vec4(fresnelBias+fresnelScale*pow(1+dot(fvViewDirection,fvNormal), fresnelPower));
+ 
+ vec4 ambient_color = (Cdiffuse*0.5* Fresnel * fvAmbient
+                  + Cscatter1*0.4* Fresnel * fvAmbient 
+                  + Cscatter2 *0.1* Fresnel * fvAmbient );
+                  
+           
+                                    
+                  
+ vec4 diffuse_color = ((Cdiffuse*0.5 * Fresnel * fvDiffuse * fvLightColor
+                  + Cscatter1*0.4* Fresnel * fvDiffuse *fvLightColor
+                  + Cscatter2 *0.1* Fresnel * fvDiffuse *fvLightColor) ) * lerp(vec4(1.0), Cdiffuse*lum, 0.1);
+ 
+ 
+                
+
+ vec4 specularity =       fvSpecular * ( pow( fRDotV, fSpecularPower ) ) * fNDotL * Cnoise ;                        
+ vec4 specular_color = (Cdiffuse*0.5 * fvSpecular
+                  + Cscatter1*0.4* Fresnel * fvSpecular 
+                  + Cscatter2 *0.1* Fresnel * fvSpecular ) + ((specularity));    
+   
+   
+   vec4 color = Cdiffuse * 0.5 + Cscatter1*0.4 + Cscatter2 *0.1;
+    
+                                
+   vec4  fvTotalAmbient   = (fvAmbient * color) ; 
+   vec4  fvTotalDiffuse   = (fvDiffuse * fNDotL * color * lerp(vec4(1.0), Cdiffuse*lum, 0.1)); 
+   vec4  fvTotalSpecular  = (fvSpecular * ( pow( fRDotV, fSpecularPower ) ) * Cnoise);
+ 
+ 
+   vec4 final_color = ambient_color + diffuse_color + specular_color + specularity ;
+ 
+ 
+   
+ 
+    gl_FragColor =  (final_color);
+    //gl_FragColor = ( fvTotalAmbient + fvTotalDiffuse + fvTotalSpecular ) * Fresnel;  
+    
+}
